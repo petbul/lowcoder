@@ -76,6 +76,10 @@ export default clip(
     // A new app every run: the Layers switch is saved with the app, so a reused
     // one would start the next run with it already on.
     const id = await s.offCamera(async (page) => {
+      // On a fresh runner, Vite bundles the editor's dependencies and
+      // compiles its source on the first load, which takes longer than
+      // Playwright's default of 30 seconds for a page to load.
+      page.setDefaultNavigationTimeout(180_000);
       await signIn(page.request);
       const me = await (await page.request.get("/api/users/me")).json();
       const created = await (
