@@ -1,0 +1,56 @@
+name: Versioncam
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  # On a pull request: record every clip, and fail with a comment if one broke.
+  check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: write # to comment when a clip breaks
+    steps:
+      - uses: actions/checkout@v4
+      # The API the editor talks to, from the released all-in-one image. The
+      # editor itself runs from this checkout (client/packages/lowcoder/versioncam.config.ts).
+      - run: docker run -d -p 3000:3000 lowcoderorg/lowcoder-ce:3.0.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+          cache-dependency-path: client/yarn.lock
+      - run: yarn install --immutable
+        working-directory: client
+      - uses: versioncam/action@v1
+        with:
+          working-directory: client/packages/lowcoder
+
+  # On main: record every clip, then publish the recordings to version.cam.
+  publish:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write # GitHub's token for version.cam, so no secret is stored
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker run -d -p 3000:3000 lowcoderorg/lowcoder-ce:3.0.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: yarn
+          cache-dependency-path: client/yarn.lock
+      - run: yarn install --immutable
+        working-directory: client
+      - uses: versioncam/action@v1
+        with:
+          working-directory: client/packages/lowcoder
+      - uses: versioncam/action@v1
+        if: ${{ !cancelled() }} # a clip that broke is published as broken
+        with:
+          mode: publish
+          working-directory: client/packages/lowcoder
